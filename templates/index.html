@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agente Text-to-SQL (Inventario)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Agente de Inventario Inteligente</h1>
+            <p>Transforma tus preguntas en lenguaje natural a consultas SQL y obtén resultados instantáneos.</p>
+            <div class="status-indicator">
+                <span class="dot active"></span> Activo y listo!
+            </div>
+
+            <form id="queryForm">
+                <label for="user_query">¿Qué quieres saber de tu inventario?</label>
+                <input type="text" id="user_query" name="user_query" placeholder='Ej: "Mostrar todos los productos en stock" o "¿Cuál es el precio de Laptop Pro?"'>
+                <button type="submit">Consultar Base de Datos</button>
+            </form>
+
+            <div id="results" class="results-area">
+                <p>Esperando tu consulta...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('queryForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // Evita que el formulario recargue la página
+
+            const userQuery = document.getElementById('user_query').value;
+            const resultsArea = document.getElementById('results');
+            resultsArea.innerHTML = '<p> Analizando y consultando...</p>'; // Mensaje de carga
+
+            try {
+                const response = await fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: userQuery })
+                });
+
+                const data = await response.json(); // Esperamos un JSON de Flask
+                
+                // Mostrar el SQL generado y los resultados
+                let outputHtml = `<p><strong> SQL Generado:</strong> <code>${data.sql_generated}</code></p>`;
+                
+                if (data.error) {
+                    outputHtml += `<p class="error-message"><strong> Error:</strong> ${data.error}</p>`;
+                } else if (data.result) {
+                    outputHtml += `<p class="success-message"><strong> Resultado:</strong></p>`;
+                    
+                    // Mejorar la visualización de los resultados de SELECT
+                    if (Array.isArray(data.result) && data.result.length > 0 && typeof data.result[0] === 'object') {
+                        // Si es un array de objetos (SELECT)
+                        outputHtml += '<table class="results-table">';
+                        // Encabezados
+                        outputHtml += '<thead><tr>';
+                        for (const key in data.result[0]) {
+                            outputHtml += `<th>${key}</th>`;
+                        }
+                        outputHtml += '</tr></thead><tbody>';
+                        // Filas
+                        data.result.forEach(row => {
+                            outputHtml += '<tr>';
+                            for (const key in row) {
+                                outputHtml += `<td>${row[key]}</td>`;
+                            }
+                            outputHtml += '</tr>';
+                        });
+                        outputHtml += '</tbody></table>';
+                    } else if (typeof data.result === 'string') {
+                        // Si es un mensaje de INSERT/UPDATE/DELETE
+                        outputHtml += `<p>${data.result}</p>`;
+                    } else {
+                        // Otro tipo de resultado
+                        outputHtml += `<pre>${JSON.stringify(data.result, null, 2)}</pre>`;
+                    }
+
+                } else {
+                    outputHtml += `<p>No se obtuvieron resultados específicos.</p>`;
+                }
+                
+                resultsArea.innerHTML = outputHtml;
+
+            } catch (error) {
+                resultsArea.innerHTML = `<p class="error-message">Error de conexión con el servidor: ${error.message}</p>`;
+                console.error('Error fetching data:', error);
+            }
+        });
+    </script>
+</body>
+</html>
